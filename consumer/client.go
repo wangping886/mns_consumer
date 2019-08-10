@@ -1,4 +1,4 @@
-package mq_consumer
+package consumer
 
 import (
 	"net"
@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	MNSEndPoint  = "xxxx"
-	MNSAccessId  = "xxxx"
-	MNSAccessKey = "xxxx"
+	MNSEndPoint  = "xxxxx"
+	MNSAccessId  = "xxxxx"
+	MNSAccessKey = "xxxxx"
 )
 
 var __aliyunMnsQueueHttpClient *http.Client

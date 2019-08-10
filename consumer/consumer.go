@@ -1,4 +1,4 @@
-package mq_consumer
+package consumer
 
 import (
 	"context"
@@ -16,14 +16,14 @@ import (
 
 const defaultTimeoutMaxRetry = 5
 
-type Handler func(*consumer, mns.Message)
+type Handler func(*Consumer, mns.Message)
 
 type queueMsg struct {
-	c      *consumer
+	c      *Consumer
 	mnsMsg mns.Message
 }
 
-type consumer struct {
+type Consumer struct {
 	client          *mns.QueueClient
 	hanlder         Handler
 	t               tomb.Tomb
@@ -31,15 +31,15 @@ type consumer struct {
 	queSize         int
 	limitSize       int
 	queMsgChan      chan queueMsg
-	limitChan       chan bool // 并发数
+	LimitChan       chan bool // 并发数
 	w               util.WaitGroupWrapper
 	serveDone       chan struct{}
 }
 
-type option func(c *consumer)
+type option func(c *Consumer)
 
-func NewConsumer(queName string, handler Handler, options ...option) *consumer {
-	c := &consumer{
+func NewConsumer(queName string, handler Handler, options ...option) *Consumer {
+	c := &Consumer{
 		client:          SetQueue(queName),
 		hanlder:         handler,
 		timeoutMaxRetry: defaultTimeoutMaxRetry,
@@ -51,29 +51,29 @@ func NewConsumer(queName string, handler Handler, options ...option) *consumer {
 	}
 
 	c.queMsgChan = make(chan queueMsg, c.queSize)
-	c.limitChan = make(chan bool, c.limitSize)
+	c.LimitChan = make(chan bool, c.limitSize)
 	return c
 }
 
 func WithTimeoutRetry(retry int) option {
-	return func(c *consumer) {
+	return func(c *Consumer) {
 		c.timeoutMaxRetry = retry
 	}
 }
 
 func WithChanSize(size int) option {
-	return func(c *consumer) {
+	return func(c *Consumer) {
 		c.queSize = size
 	}
 }
 
 func WithLimitSize(size int) option {
-	return func(c *consumer) {
+	return func(c *Consumer) {
 		c.limitSize = size
 	}
 }
 
-func (c *consumer) Start() {
+func (c *Consumer) Start() {
 	c.w.Wrap(c.startQueueWorker)
 	c.w.Wrap(c.serve)
 
@@ -83,7 +83,7 @@ func (c *consumer) Start() {
 	}()
 }
 
-func (c *consumer) serve() {
+func (c *Consumer) serve() {
 	var (
 		i    int
 		msgs []mns.Message
@@ -105,7 +105,7 @@ func (c *consumer) serve() {
 			if timeoutErr(err) || mnsMsgNotFound(err) {
 				continue // 连接超时重试
 			} else {
-				log.Println()
+				log.Println("consumerServe", "receiveMessageFail", "err", err)
 				break
 			}
 		}
@@ -114,6 +114,8 @@ func (c *consumer) serve() {
 			select {
 			case <-ctx.Done():
 				//context.DeadlineExceeded, context.Canceled
+				log.Println("msg", ctx.Err(), "method", "consumer.Serve", "func", "ctx.Done")
+
 				goto DONE
 			default:
 			}
@@ -121,6 +123,8 @@ func (c *consumer) serve() {
 
 		if err != nil {
 			if mnsMsgNotFound(err) {
+				log.Println("errmsg", err, "method", "consumer.Serve", "func", "getMsg")
+
 				continue
 			}
 			time.Sleep(time.Second)
@@ -128,7 +132,7 @@ func (c *consumer) serve() {
 		}
 
 		for _, msg := range msgs {
-			c.limitChan <- true
+			c.LimitChan <- true
 			c.queMsgChan <- queueMsg{
 				c:      c,
 				mnsMsg: msg,
@@ -137,9 +141,11 @@ func (c *consumer) serve() {
 	}
 DONE:
 	close(c.serveDone)
+	log.Println("msg", "serve.done", "method", "consumer.Serve")
+
 }
 
-func (c *consumer) startQueueWorker() {
+func (c *Consumer) startQueueWorker() {
 	tick := time.NewTicker(10 * time.Millisecond)
 	defer tick.Stop()
 
@@ -152,14 +158,20 @@ func (c *consumer) startQueueWorker() {
 		<-tick.C
 		go c.hanlder(msg.c, msg.mnsMsg)
 	}
+	log.Println("msg", "worker.done", "method", "startQueueWorker")
+
 }
 
-func (c *consumer) Stop() {
+func (c *Consumer) Stop() {
 	c.t.Kill(nil)
 	c.t.Wait()
+	log.Println("msg", "consumer.done", "method", "Stop")
+
 }
 
-func (c *consumer) Delete(ctx context.Context, msg mns.Message) {
+func (c *Consumer) Delete(ctx context.Context, msg mns.Message) {
+	log.Println("method", "mns.Delete", "msgID", msg.MessageId)
+
 	var err error
 
 	for i := 0; i < c.timeoutMaxRetry; i++ {
