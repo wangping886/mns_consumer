@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/wangping886/mns_consumer/mns.aliyun.v20150606"
+	"github.com/wangping886/mns_consumer/mns.aliyun"
 )
 
 const (

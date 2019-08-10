@@ -8,7 +8,7 @@ import (
 
 	"gopkg.in/tomb.v1"
 
-	"github.com/wangping886/mns_consumer/mns.aliyun.v20150606"
+	"github.com/wangping886/mns_consumer/mns.aliyun"
 	"log"
 
 	"github.com/wangping886/mns_consumer/util"
