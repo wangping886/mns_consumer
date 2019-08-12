@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/wangping886/mns_consumer/consumer"
 	"github.com/wangping886/mns_consumer/mns.aliyun"
-	"go-common/library/os/signal"
+	"signal"
 	"log"
 	"os"
 	"syscall"
