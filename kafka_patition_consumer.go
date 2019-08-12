@@ -60,7 +60,7 @@ func main() {
 
 	var wg sync.WaitGroup
 	wg.Add(len(partitions))
-
+	//目前消费者没有负载均衡到patition
 	for _, partition := range partitions {
 		log.Println("consume partition:", partition)
 
@@ -89,6 +89,8 @@ func main() {
 						log.Fatalln("error:", err)
 					}
 				case msg := <-partitionConsumer.Messages():
+					//消息处理可以加上重试，失败记log
+					//todo flush?
 					if msg != nil {
 						log.Println("topic:", msg.Topic, "partition:", msg.Partition, "offset:", msg.Offset, "message:", string(msg.Value))
 					}
